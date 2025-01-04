@@ -1,0 +1,243 @@
+El problema del negocio Una entidad bancaria contrata a una empresa de marketing encargada de contactar telefónicamente a posibles clientes para determinar si están interesados o no en adquirir un certificado de depósito a término con el banco.
+¿Qué perfil tienen los clientes con mayor potencial de conversión?
+
+El set de datos La información recolectada por la empresa de mercadeo se encuentra en un archivo CSV (dataset_banco.csv) con 45215 filas y 17 columnas.
+Cada registro contiene 16 características (las primeras 16 columnas) y una categoría ("yes" o "no" dependiendo de si la persona está o no interesada en adquirir el producto). Las columnas son:
+
+"age": edad (numérica) "job": tipo de trabajo (categórica: "admin.", "unknown", "unemployed", "management", "housemaid", "entrepreneur", "student", "blue-collar","self-employed", "retired", "technician", "services") "marital": estado civil (categórica: "married", "divorced", "single") "education": nivel educativo (categórica: "unknown", "secondary", "primary", "tertiary") "default": si dejó de pagar sus obligaciones (categórica: "yes", "no") "balance": saldo promedio anual en euros (numérica) "housing": ¿tiene o no crédito hipotecario? (categórica: "yes", "no") "loan": ¿tiene créditos de consumo? (categórica: "yes", "no") "contact": medio a través del cual fue contactado (categórica: "unknown", "telephone", "cellular") "day": último día del mes en el que fue contactada (numérica) "month": último mes en el que fue contactada (categórica: "jan", "feb", "mar", ..., "nov", "dec") "duration": duración (en segundos) del último contacto (numérica) "campaign": número total de veces que fue contactada durante la campaña (numérica) "pdays": número de días transcurridos después de haber sido contactado antes de la campaña actual (numérica. -1 indica que no fue contactado previamente) "previous": número de veces que ha sido contactada antes de esta campaña (numérica) "poutcome": resultado de la campaña de marketing anterior (categórica: "unknown", "other", "failure", "success") "y": categoría ¿el cliente se suscribió a un depósito a término? (categórica: "yes", "no")
+
+Una primera mirada al dataset
+Haz doble clic (o ingresa) para editar
+
+from google.colab import files
+archivo = files.upload()
+
+# Importar librerías
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+datos = pd.read_csv('dataset_banco.csv')
+datos
+
+datos.info()
+<class 'pandas.core.frame.DataFrame'>
+RangeIndex: 45215 entries, 0 to 45214
+Data columns (total 17 columns):
+ #   Column     Non-Null Count  Dtype  
+---  ------     --------------  -----  
+ 0   age        45215 non-null  int64  
+ 1   job        45213 non-null  object 
+ 2   marital    45214 non-null  object 
+ 3   education  45214 non-null  object 
+ 4   default    45215 non-null  object 
+ 5   balance    45213 non-null  float64
+ 6   housing    45215 non-null  object 
+ 7   loan       45215 non-null  object 
+ 8   contact    45215 non-null  object 
+ 9   day        45215 non-null  int64  
+ 10  month      45215 non-null  object 
+ 11  duration   45214 non-null  float64
+ 12  campaign   45215 non-null  int64  
+ 13  pdays      45214 non-null  float64
+ 14  previous   45215 non-null  int64  
+ 15  poutcome   45215 non-null  object 
+ 16  y          45215 non-null  object 
+dtypes: float64(3), int64(4), object(10)
+memory usage: 5.9+ MB
+Haz doble clic (o ingresa) para editar
+
+
+Limpieza Realizaremos el proceso de limpieza teniendo en cuenta las situaciones más comunes:
+Datos faltantes en algunas celdas Columnas irrelevantes (que no responden al problema que queremos resolver) Registros (filas) repetidos Valores extremos (outliers) en el caso de las variables numéricas. Se deben analizar en detalle pues no necesariamente la solución es eliminarlos Errores tipográficos en el caso de las variables categóricas Al final de este proceso de limpieza deberíamos tener un set de datos íntegro, listo para la fase de Análisis Exploratorio.
+
+4.1 Datos faltantes Acá comenzamos a ver que los datos no están completos, pues no todas las columnas tienen la misma cantidad de registros.
+
+El número total de registros debería ser 45.215. Sin embargo columnas como "job", "marital", "education", "balance", "duration" y "pdays".
+
+Por ser tan pocos los datos faltantes optaremos por eliminar las filas correspondientes:
+
+datos.dropna(inplace=True)
+datos.info()
+<class 'pandas.core.frame.DataFrame'>
+Index: 45207 entries, 0 to 45214
+Data columns (total 17 columns):
+ #   Column     Non-Null Count  Dtype  
+---  ------     --------------  -----  
+ 0   age        45207 non-null  int64  
+ 1   job        45207 non-null  object 
+ 2   marital    45207 non-null  object 
+ 3   education  45207 non-null  object 
+ 4   default    45207 non-null  object 
+ 5   balance    45207 non-null  float64
+ 6   housing    45207 non-null  object 
+ 7   loan       45207 non-null  object 
+ 8   contact    45207 non-null  object 
+ 9   day        45207 non-null  int64  
+ 10  month      45207 non-null  object 
+ 11  duration   45207 non-null  float64
+ 12  campaign   45207 non-null  int64  
+ 13  pdays      45207 non-null  float64
+ 14  previous   45207 non-null  int64  
+ 15  poutcome   45207 non-null  object 
+ 16  y          45207 non-null  object 
+dtypes: float64(3), int64(4), object(10)
+memory usage: 6.2+ MB
+4.2 Columnas irrelevantes Una columna irrelevante puede ser:
+
+Una columna que no contiene información relevante para el problema que queremos resolver. Por ejemplo en este caso podría ser una columna que no guarde relación con el posible perfil del cliente (deporte favorito, hobbies, comida favorita, etc.) Una columna categórica pero con un sólo nivel. Por ejemplo si en la columna "job" solo tuviésemos el nivel "unknown". Una columna numérica pero con un sólo valor. Por ejemplo si en la columna "edad" todos los vlaores fuesen iguales a 50. Columnas con información redundante. Por ejemplo si además de las columnas "month" y "day" tuviésemos la columna "month-day", resultado de combinar las dos anteriores. Si tenemos la duda de si alguna columna puede ser relevante o no lo mejor es dejarla (y más adelante en posteriores etapas podremos darnos cuenta de si se debe preservar o no).
+
+En este caso todas las columnas pueden resultar relevantes, pero debemos verificar que no haya columnas categóricas con un sólo nivel, o columnas numéricas con un sólo valor:
+
+Haz doble clic (o ingresa) para editar
+
+# Conteo de los niveles en las diferentes columnas categóricas
+cols_cat = ['job', 'marital', 'education', 'default', 'housing',
+       'loan', 'contact', 'month', 'poutcome', 'y']
+
+for col in cols_cat:
+  print(f'Columna {col}: {datos[col].nunique()} subniveles')
+Columna job: 18 subniveles
+Columna marital: 6 subniveles
+Columna education: 10 subniveles
+Columna default: 2 subniveles
+Columna housing: 2 subniveles
+Columna loan: 6 subniveles
+Columna contact: 5 subniveles
+Columna month: 12 subniveles
+Columna poutcome: 6 subniveles
+Columna y: 2 subniveles
+Todas las columnas categóricas tienen más de 1 subnivel. No eliminaremos ninguna.
+
+Verifiquemos lo que ocurre con las columnas numéricas:
+
+datos.describe()
+
+Todas las columnas numéricas tienen desviaciones estándar ("std") diferentes de cero, lo que indica que no tienen un único valor.
+
+Preservaremos todas las columnas numéricas.
+
+4.3 Filas repetidas
+
+print(f'Tamaño del set antes de eliminar las filas repetidas: {datos.shape}')
+datos.drop_duplicates(inplace=True)
+print(f'Tamaño del set después de eliminar las filas repetidas: {datos.shape}')
+Tamaño del set antes de eliminar las filas repetidas: (45207, 17)
+Tamaño del set después de eliminar las filas repetidas: (45203, 17)
+4.4 Outliers en las variables numéricas No siempre se deben eliminar los outliers porque dependiendo de la variable numérica analizada estos pueden contener información importante.
+
+Creemos gráficas tipo "boxplot" de las columnas numéricas:
+
+# Generar gráficas individuales pues las variables numéricas
+# están en rangos diferentes
+cols_num = ['age', 'balance', 'day', 'duration', 'campaign',
+            'pdays', 'previous']
+
+fig, ax = plt.subplots(nrows=7, ncols=1, figsize=(8,30))
+fig.subplots_adjust(hspace=0.5)
+
+for i, col in enumerate(cols_num):
+    sns.boxplot(x=col, data=datos, ax=ax[i])
+    ax[i].set_title(col)
+
+
+
+
+Observaciones:
+
+"age": hay sujetos con edades mucho mayores a 100 años "duration": hay valores negativos "previous": hay un valor extremadamente alto (cercano a 300
+
+# Eliminar filas con "age">100
+print(f'Tamaño del set antes de eliminar registros de edad: {datos.shape}')
+datos = datos[datos['age']<=100]
+print(f'Tamaño del set después de eliminar registros de edad: {datos.shape}')
+Tamaño del set antes de eliminar registros de edad: (45203, 17)
+Tamaño del set después de eliminar registros de edad: (45195, 17)
+# Eliminar filas con "duration"<0
+print(f'Tamaño del set antes de eliminar registros de duración: {datos.shape}')
+datos = datos[datos['duration']>0]
+print(f'Tamaño del set después de eliminar registros de duración: {datos.shape}')
+Tamaño del set antes de eliminar registros de duración: (45195, 17)
+Tamaño del set después de eliminar registros de duración: (45190, 17)
+# Eliminar filas con "previous">100
+print(f'Tamaño del set antes de eliminar registros de previous: {datos.shape}')
+datos = datos[datos['previous']<=100]
+print(f'Tamaño del set después de eliminar registros de previous: {datos.shape}')
+Tamaño del set antes de eliminar registros de previous: (45190, 17)
+Tamaño del set después de eliminar registros de previous: (45189, 17)
+4.5 Errores tipográficos en variables categóricas En una variable categórica pueden aparecer sub-niveles como "unknown" y "UNK" que para nosotros son equivalentes pero que para nuestro programa parecerían diferentes.
+
+Se deben unificar estos sub-niveles
+
+# Graficar los subniveles de cada variable categórica
+cols_cat = ['job', 'marital', 'education', 'default', 'housing',
+       'loan', 'contact', 'month', 'poutcome', 'y']
+
+fig, ax = plt.subplots(nrows=10, ncols=1, figsize=(10,30))
+fig.subplots_adjust(hspace=1)
+
+for i, col in enumerate(cols_cat):
+  sns.countplot(x=col, data=datos, ax=ax[i])
+  ax[i].set_title(col)
+  ax[i].set_xticklabels(ax[i].get_xticklabels(),rotation=30)
+
+Inicialmente se observa que hay sub-niveles con el mismo nombre pero escritos en minúscula, en mayúscula o con la primera letra en mayúscula.
+
+Unifiquemos estos sub-niveles inicialmente:
+
+for column in datos.columns:
+    # Representar en minúsculas sólo si la columna es categórica
+    if column in cols_cat:
+        datos[column] = datos[column].str.lower()
+
+# Y generemos las gráficas nuevamente
+fig, ax = plt.subplots(nrows=10, ncols=1, figsize=(10,30))
+fig.subplots_adjust(hspace=1)
+
+for i, col in enumerate(cols_cat):
+  sns.countplot(x=col, data=datos, ax=ax[i])
+  ax[i].set_title(col)
+  ax[i].set_xticklabels(ax[i].get_xticklabels(),rotation=30)
+
+# job: unificar admin. y administrative
+print(datos['job'].unique())
+datos['job'] = datos['job'].str.replace('admin.','administrative', regex=False)
+print(datos['job'].unique())
+['management' 'technician' 'entrepreneur' 'blue-collar' 'unknown'
+ 'retired' 'admin.' 'services' 'self-employed' 'unemployed' 'housemaid'
+ 'student' 'administrative']
+['management' 'technician' 'entrepreneur' 'blue-collar' 'unknown'
+ 'retired' 'administrative' 'services' 'self-employed' 'unemployed'
+ 'housemaid' 'student']
+# marital: unificar div. y divorced
+print(datos['marital'].unique())
+datos['marital'] = datos['marital'].str.replace('div.','divorced', regex=False)
+print(datos['marital'].unique())
+['married' 'single' 'div.' 'divorced']
+['married' 'single' 'divorced']
+# education: unificar sec. y secondary, unk y unknown
+print(datos['education'].unique())
+datos['education'] = datos['education'].str.replace('sec.','secondary', regex=False)
+datos.loc[datos['education']=='unk','education'] = 'unknown'
+print(datos['education'].unique())
+['tertiary' 'secondary' 'unknown' 'primary' 'sec.' 'unk']
+['tertiary' 'secondary' 'unknown' 'primary']
+# contact: unificar telephone y phone
+print(datos['contact'].unique())
+datos.loc[datos['contact']=='phone','contact'] = 'telephone'
+datos.loc[datos['contact']=='mobile','contact'] = 'cellular'
+print(datos['contact'].unique())
+['unknown' 'cellular' 'telephone' 'phone' 'mobile']
+['unknown' 'cellular' 'telephone']
+# poutcome: unificar unk y unknown
+print(datos['poutcome'].unique())
+datos.loc[datos['poutcome']=='unk','poutcome']='unknown'
+print(datos['poutcome'].unique())
+['unknown' 'unk' 'failure' 'other' 'success']
+['unknown' 'failure' 'other' 'success']
+datos.shape
+(45189, 17)
+¡Y listo, ya hemos realizado la limpieza de nuestro set de datos!
+
+Originalmente tenía 45.215 registros y 17 columnas. El dataset resultante tiene 45.189 filas (26 menos) y 17 columnas.
+
+El set de datos ya está listo para el Análisis Exploratorio.
